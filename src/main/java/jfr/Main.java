@@ -14,18 +14,16 @@ public class Main {
             System.exit(1);
         }
 
+
         var fileName = args[0];
         try (var recordingFile = new RecordingFile(Paths.get(fileName))) {
-                while (recordingFile.hasMoreEvents()) {
+            var registry = HandlerRegistry.createDefault();
+            while (recordingFile.hasMoreEvents()) {
                 var event = recordingFile.readEvent();
                 if (event != null) {
-                    var details = decodeEvent(event);
-                    if (details == null) {
-                        // Log a failure to recognise details
-                    } else {
-                        // Process details
-                    System.out.println(details);
-                    }
+                    registry.all().stream()
+                            .filter(h -> h.test(event))
+                            .forEach(h -> h.accept(event));
                 }
             }
         } catch (IOException e) {
