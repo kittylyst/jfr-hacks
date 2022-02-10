@@ -1,7 +1,7 @@
 package jfr;
 
 import jfr.cpu.OverallCPULoadHandler;
-import jfr.memory.G1GarbageCollectionHandler;
+import jfr.memory.G1HeapSummaryHandler;
 import jfr.memory.GCHeapSummaryHandler;
 import jfr.memory.ObjectAllocationInNewTLABHandler;
 import jfr.memory.ObjectAllocationOutsideTLABHandler;
@@ -24,7 +24,7 @@ final class HandlerRegistry {
             new ObjectAllocationOutsideTLABHandler(grouper),
 //            new NetworkReadHandler(grouper),
 //            new NetworkWriteHandler(grouper),
-            new G1GarbageCollectionHandler(),
+            new G1HeapSummaryHandler(),
             new GCHeapSummaryHandler(),
 //            new ContextSwitchRateHandler(),
             new OverallCPULoadHandler()

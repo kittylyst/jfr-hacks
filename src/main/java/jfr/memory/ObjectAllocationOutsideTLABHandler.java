@@ -30,26 +30,22 @@ public final class ObjectAllocationOutsideTLABHandler extends AbstractThreadDisp
 
   @Override
   public Consumer<RecordedEvent> createPerThreadSummarizer(String threadName) {
-    return new PerThreadObjectAllocationOutsideTLABHandler(histogram, threadName);
+    return new PerThreadObjectAllocationOutsideTLABHandler(threadName);
   }
 
   /** This class aggregates all non-TLAB allocation JFR events for a single thread */
   private static class PerThreadObjectAllocationOutsideTLABHandler
       implements Consumer<RecordedEvent> {
     private static final String ALLOCATION_SIZE = "allocationSize";
+    private final String threadName;
 
-    private final DoubleHistogram histogram;
-    private final Attributes attributes;
-
-    public PerThreadObjectAllocationOutsideTLABHandler(
-        DoubleHistogram histogram, String threadName) {
-      this.histogram = histogram;
-      this.attributes = Attributes.of(ATTR_THREAD_NAME, threadName, ATTR_ARENA_NAME, "Main");
+    public PerThreadObjectAllocationOutsideTLABHandler(String threadName) {
+      this.threadName = threadName;
     }
 
     @Override
     public void accept(RecordedEvent ev) {
-      histogram.record(ev.getLong(ALLOCATION_SIZE), attributes);
+      var allocated = ev.getLong(ALLOCATION_SIZE);
       // Probably too high a cardinality
       // ev.getClass("objectClass").getName();
     }

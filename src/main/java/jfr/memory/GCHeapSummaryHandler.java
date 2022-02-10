@@ -9,10 +9,6 @@ import java.util.Map;
 
 /** This class handles GCHeapSummary JFR events. For GC purposes they come in pairs. */
 public final class GCHeapSummaryHandler implements RecordedEventHandler {
-  private static final String METRIC_NAME_DURATION = "runtime.jvm.gc.duration";
-  private static final String METRIC_DESCRIPTION_DURATION = "GC Duration";
-  private static final String METRIC_NAME_MEMORY = "runtime.jvm.memory.utilization";
-  private static final String METRIC_DESCRIPTION_MEMORY = "Heap utilization";
   private static final String EVENT_NAME = "jdk.GCHeapSummary";
   private static final String BEFORE = "Before GC";
   private static final String AFTER = "After GC";
@@ -68,14 +64,13 @@ public final class GCHeapSummaryHandler implements RecordedEventHandler {
   }
 
   private void recordValues(RecordedEvent before, RecordedEvent after) {
-    durationHistogram.record(
-        after.getStartTime().toEpochMilli() - before.getStartTime().toEpochMilli());
+    var duration = after.getStartTime().toEpochMilli() - before.getStartTime().toEpochMilli();
     if (after.hasField(HEAP_USED)) {
-      memoryHistogram.record(after.getLong(HEAP_USED), ATTR_MEMORY_USED);
-    }
-    if (after.hasField(HEAP_SPACE)) {
-      if (after.getValue(HEAP_SPACE) instanceof RecordedObject ro) {
-        memoryHistogram.record(ro.getLong(COMMITTED_SIZE), ATTR_MEMORY_COMMITTED);
+      var used = after.getLong(HEAP_USED);
+      if (after.hasField(HEAP_SPACE)) {
+        if (after.getValue(HEAP_SPACE) instanceof RecordedObject ro) {
+          var committed = ro.getLong(COMMITTED_SIZE);
+        }
       }
     }
   }

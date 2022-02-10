@@ -29,25 +29,22 @@ public final class ObjectAllocationInNewTLABHandler extends AbstractThreadDispat
 
   @Override
   public Consumer<RecordedEvent> createPerThreadSummarizer(String threadName) {
-    return new PerThreadObjectAllocationInNewTLABHandler(histogram, threadName);
+    return new PerThreadObjectAllocationInNewTLABHandler(threadName);
   }
 
   /** This class aggregates all TLAB allocation JFR events for a single thread */
   private static class PerThreadObjectAllocationInNewTLABHandler
       implements Consumer<RecordedEvent> {
     private static final String TLAB_SIZE = "tlabSize";
+    private final String attributes;
 
-    private final DoubleHistogram histogram;
-    private final Attributes attributes;
-
-    public PerThreadObjectAllocationInNewTLABHandler(DoubleHistogram histogram, String threadName) {
-      this.histogram = histogram;
-      this.attributes = Attributes.of(ATTR_THREAD_NAME, threadName, ATTR_ARENA_NAME, "TLAB");
+    public PerThreadObjectAllocationInNewTLABHandler(String threadName) {
+      this.attributes = threadName;
     }
 
     @Override
     public void accept(RecordedEvent ev) {
-      histogram.record(ev.getLong(TLAB_SIZE), attributes);
+      var allocated = ev.getLong(TLAB_SIZE);
       // Probably too high a cardinality
       // ev.getClass("objectClass").getName();
     }
