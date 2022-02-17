@@ -47,5 +47,6 @@ final class HandlerRegistry implements AutoCloseable {
   @Override
   public void close() {
     all().forEach(h -> h.safeShutdown());
+//    System.out.println("Handlers closed successfully");
   }
 }

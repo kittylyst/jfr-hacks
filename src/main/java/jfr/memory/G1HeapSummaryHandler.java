@@ -86,6 +86,12 @@ public final class G1HeapSummaryHandler extends AbstractFileWritingRecordedEvent
             var survivorUsed = after.getLong("survivorUsedSize");
             if (after.hasField("numberOfRegions")) {
               var regions = after.getLong("numberOfRegions");
+              try {
+                var timestamp = after.getStartTime().toEpochMilli();
+                writer.write(String.format("%d,%d,%d,%d,%d,%d%n",timestamp, edenUsed, edenDelta, edenTotal, survivorUsed, regions));
+              } catch (IOException e) {
+                System.err.println("Couldn't write to CPU output file");
+              }
             }
           }
         }

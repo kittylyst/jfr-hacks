@@ -34,7 +34,7 @@ public final class ObjectAllocationOutsideTLABHandler extends AbstractThreadDisp
   }
 
   /** This class aggregates all non-TLAB allocation JFR events for a single thread */
-  private static class PerThreadObjectAllocationOutsideTLABHandler
+  private class PerThreadObjectAllocationOutsideTLABHandler
       implements Consumer<RecordedEvent> {
     private static final String ALLOCATION_SIZE = "allocationSize";
     private final String threadName;
@@ -46,8 +46,13 @@ public final class ObjectAllocationOutsideTLABHandler extends AbstractThreadDisp
     @Override
     public void accept(RecordedEvent ev) {
       var allocated = ev.getLong(ALLOCATION_SIZE);
-      // Probably too high a cardinality
-      // ev.getClass("objectClass").getName();
+      var timestamp = ev.getStartTime().toEpochMilli();
+      var className = ev.getClass("objectClass").getName();
+      try {
+        writer.write(String.format("%d,%d,%s,%s%n",timestamp, allocated, threadName, className));
+      } catch (IOException e) {
+        System.err.println("Couldn't write to CPU output file");
+      }
     }
   }
 }

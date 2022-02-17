@@ -73,6 +73,13 @@ public final class GCHeapSummaryHandler extends AbstractFileWritingRecordedEvent
       if (after.hasField(HEAP_SPACE)) {
         if (after.getValue(HEAP_SPACE) instanceof RecordedObject ro) {
           var committed = ro.getLong(COMMITTED_SIZE);
+          try {
+            var timestamp = after.getStartTime().toEpochMilli();
+            writer.write(String.format("%d,%d,%d,%d%n",timestamp, duration, used, committed));
+          } catch (IOException e) {
+            System.err.println("Couldn't write to CPU output file");
+          }
+
         }
       }
     }
