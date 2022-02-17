@@ -39,6 +39,11 @@ public final class G1HeapSummaryHandler extends AbstractFileWritingRecordedEvent
   }
 
   @Override
+  protected String getHeader() {
+    return "timestamp,edenUsed,edenDelta,edenTotal,survivorUsed,regions";
+  }
+
+  @Override
   public String getEventName() {
     return EVENT_NAME;
   }

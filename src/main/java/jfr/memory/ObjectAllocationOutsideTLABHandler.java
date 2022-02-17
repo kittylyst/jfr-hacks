@@ -24,6 +24,11 @@ public final class ObjectAllocationOutsideTLABHandler extends AbstractThreadDisp
   }
 
   @Override
+  protected String getHeader() {
+    return "timestamp,allocated,threadName,className";
+  }
+
+  @Override
   public String getEventName() {
     return EVENT_NAME;
   }

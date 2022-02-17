@@ -15,6 +15,8 @@ public abstract class AbstractFileWritingRecordedEventHandler implements Recorde
         this.fileName = fileName;
         tempPath = Files.createTempFile(fileName,"tmp");
         writer = Files.newBufferedWriter(tempPath);
+        writer.write(getHeader());
+        writer.write('\n');
     }
 
     @Override
@@ -26,4 +28,5 @@ public abstract class AbstractFileWritingRecordedEventHandler implements Recorde
 
     protected abstract String getPrefix();
 
+    protected abstract String getHeader();
 }

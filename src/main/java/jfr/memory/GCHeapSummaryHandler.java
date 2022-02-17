@@ -32,6 +32,11 @@ public final class GCHeapSummaryHandler extends AbstractFileWritingRecordedEvent
   }
 
   @Override
+  protected String getHeader() {
+    return "timestamp,duration,used,committed";
+  }
+
+  @Override
   public String getEventName() {
     return EVENT_NAME;
   }

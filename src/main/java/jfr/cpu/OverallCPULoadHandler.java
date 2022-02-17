@@ -2,12 +2,8 @@ package jfr.cpu;
 
 import jdk.jfr.consumer.RecordedEvent;
 import jfr.AbstractFileWritingRecordedEventHandler;
-import jfr.RecordedEventHandler;
 
-import java.io.BufferedWriter;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -24,6 +20,11 @@ public final class OverallCPULoadHandler extends AbstractFileWritingRecordedEven
   @Override
   protected String getPrefix() {
     return "cpu_";
+  }
+
+  @Override
+  protected String getHeader() {
+    return "timestamp,user,system,total";
   }
 
   @Override
