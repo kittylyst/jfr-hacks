@@ -8,10 +8,11 @@ class JfrDataPlot:
     """Class for plotting JFR Data"""
 
     def __init__(self, data) -> None:
-        self.frame = data
+        self.data = data
 
+    """timestamp,user,system,total"""
     def plot_cpu(self):
-        self.data.hist(bins=50, figsize=(15,15))
+        self.data.plot(x="timestamp", y=["user","system","total"])
         plt.show()
 
     def plot_gc(self):

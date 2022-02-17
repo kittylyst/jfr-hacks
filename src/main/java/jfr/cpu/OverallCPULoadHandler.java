@@ -12,6 +12,7 @@ public final class OverallCPULoadHandler extends AbstractFileWritingRecordedEven
   private static final String JVM_USER = "jvmUser";
   private static final String JVM_SYSTEM = "jvmSystem";
   private static final String MACHINE_TOTAL = "machineTotal";
+  private long last = 0L;
 
   public OverallCPULoadHandler(String fileName) throws IOException {
     super(fileName);
@@ -36,6 +37,10 @@ public final class OverallCPULoadHandler extends AbstractFileWritingRecordedEven
         if (ev.hasField(MACHINE_TOTAL)) {
           var total = ev.getDouble(MACHINE_TOTAL);
           var timestamp = ev.getStartTime().toEpochMilli();
+          if (timestamp < last) {
+            System.err.println("Timestamp appears to go backwards");
+          }
+          last = timestamp;
           try {
             writer.write(String.format("%d,%f,%f,%f%n",timestamp, user, system, total));
           } catch (IOException e) {
