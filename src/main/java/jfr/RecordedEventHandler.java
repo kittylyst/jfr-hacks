@@ -2,6 +2,7 @@ package jfr;
 
 import jdk.jfr.consumer.RecordedEvent;
 
+import java.io.IOException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -28,10 +29,15 @@ public interface RecordedEventHandler extends Consumer<RecordedEvent>, Predicate
     return event.getEventType().getName().equalsIgnoreCase(getEventName());
   }
 
-  /**
-   *
-   */
-  void initializeMeter();
+  default void safeShutdown() {
+    try {
+      shutdown();
+    } catch (IOException x) {
+      throw new RuntimeException(x);
+    }
+  }
+
+  void shutdown() throws IOException;
 
   /**
    * Optionally returns a polling duration for JFR events, if present

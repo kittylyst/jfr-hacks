@@ -4,6 +4,7 @@ import jdk.jfr.consumer.RecordedEvent;
 import jfr.AbstractThreadDispatchingHandler;
 import jfr.ThreadGrouper;
 
+import java.io.IOException;
 import java.util.function.Consumer;
 
 /**
@@ -13,14 +14,13 @@ import java.util.function.Consumer;
 public final class ObjectAllocationOutsideTLABHandler extends AbstractThreadDispatchingHandler {
   private static final String EVENT_NAME = "jdk.ObjectAllocationOutsideTLAB";
 
-  public ObjectAllocationOutsideTLABHandler(ThreadGrouper grouper) {
-    super(grouper);
-    initializeMeter();
+  public ObjectAllocationOutsideTLABHandler(String fileName, ThreadGrouper grouper) throws IOException {
+    super(fileName, grouper);
   }
 
   @Override
-  public void initializeMeter() {
-
+  protected String getPrefix() {
+    return "lalloc_";
   }
 
   @Override

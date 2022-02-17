@@ -6,9 +6,10 @@
 package jfr.memory;
 
 import jdk.jfr.consumer.RecordedEvent;
-import jdk.jfr.consumer.RecordedObject;
+import jfr.AbstractFileWritingRecordedEventHandler;
 import jfr.RecordedEventHandler;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -17,7 +18,7 @@ import java.util.logging.Logger;
  * This class handles G1HeapSummary JFR events. For GC purposes they come in pairs. Basic heap
  * values are sourced from GCHeapSummary - this is young generational details
  */
-public final class G1HeapSummaryHandler implements RecordedEventHandler {
+public final class G1HeapSummaryHandler extends AbstractFileWritingRecordedEventHandler {
   private static final Logger logger = Logger.getLogger(G1HeapSummaryHandler.class.getName());
 
   private static final String EVENT_NAME = "jdk.G1HeapSummary";
@@ -28,12 +29,13 @@ public final class G1HeapSummaryHandler implements RecordedEventHandler {
 
   private final Map<Long, RecordedEvent> awaitingPairs = new HashMap<>();
 
-  public G1HeapSummaryHandler() {
-    initializeMeter();
+  public G1HeapSummaryHandler(String fileName) throws IOException {
+    super(fileName);
   }
 
   @Override
-  public void initializeMeter() {
+  protected String getPrefix() {
+    return "g1gc_";
   }
 
   @Override

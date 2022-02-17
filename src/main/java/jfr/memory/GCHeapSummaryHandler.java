@@ -2,13 +2,15 @@ package jfr.memory;
 
 import jdk.jfr.consumer.RecordedEvent;
 import jdk.jfr.consumer.RecordedObject;
+import jfr.AbstractFileWritingRecordedEventHandler;
 import jfr.RecordedEventHandler;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 /** This class handles GCHeapSummary JFR events. For GC purposes they come in pairs. */
-public final class GCHeapSummaryHandler implements RecordedEventHandler {
+public final class GCHeapSummaryHandler extends AbstractFileWritingRecordedEventHandler {
   private static final String EVENT_NAME = "jdk.GCHeapSummary";
   private static final String BEFORE = "Before GC";
   private static final String AFTER = "After GC";
@@ -20,12 +22,13 @@ public final class GCHeapSummaryHandler implements RecordedEventHandler {
 
   private final Map<Long, RecordedEvent> awaitingPairs = new HashMap<>();
 
-  public GCHeapSummaryHandler() {
-    initializeMeter();
+  public GCHeapSummaryHandler(String fileName) throws IOException {
+    super(fileName);
   }
 
   @Override
-  public void initializeMeter() {
+  protected String getPrefix() {
+    return "gc_";
   }
 
   @Override
@@ -74,4 +77,5 @@ public final class GCHeapSummaryHandler implements RecordedEventHandler {
       }
     }
   }
+
 }

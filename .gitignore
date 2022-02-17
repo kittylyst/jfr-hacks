@@ -4,6 +4,12 @@
 # Log file
 *.log
 
+# Input 
+*.jfr
+
+# Output
+*.csv
+
 # BlueJ files
 *.ctxt
 

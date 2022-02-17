@@ -14,10 +14,9 @@ public class Main {
             System.exit(1);
         }
 
-
         var fileName = args[0];
-        try (var recordingFile = new RecordingFile(Paths.get(fileName))) {
-            var registry = HandlerRegistry.createDefault();
+        try (var registry = HandlerRegistry.createDefault(fileName);
+             var recordingFile = new RecordingFile(Paths.get(fileName))) {
             while (recordingFile.hasMoreEvents()) {
                 var event = recordingFile.readEvent();
                 if (event != null) {
