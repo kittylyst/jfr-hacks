@@ -9,16 +9,11 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import static jfr.Constants.*;
+
 /** This class handles GCHeapSummary JFR events. For GC purposes they come in pairs. */
 public final class GCHeapSummaryHandler extends AbstractFileWritingRecordedEventHandler {
   private static final String EVENT_NAME = "jdk.GCHeapSummary";
-  private static final String BEFORE = "Before GC";
-  private static final String AFTER = "After GC";
-  private static final String GC_ID = "gcId";
-  private static final String WHEN = "when";
-  private static final String HEAP_USED = "heapUsed";
-  private static final String HEAP_SPACE = "heapSpace";
-  private static final String COMMITTED_SIZE = "committedSize";
 
   private final Map<Long, RecordedEvent> awaitingPairs = new HashMap<>();
 

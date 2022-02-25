@@ -15,6 +15,10 @@ class JfrDataPlot:
         self.data.plot(x="timestamp", y=["user","system","total"])
         plt.show()
 
+    # Bash snippet for determining whether the GC output for duration is STW
+    # Stupid grep trick to work around cat apparently not having the ability to print the name of the
+    # file before the line
+    # grep -H -E -e '' *_data/gc*.csv | sort -n --field-separator=',' --key=2
     def plot_gc(self):
         self.data.hist(bins=50, figsize=(15,15))
         plt.show()
@@ -40,3 +44,18 @@ if __name__ == "__main__":
             usage()
     else:
         usage()
+
+# jdk.GCHeapSummary {
+#   startTime = 14:42:44.690
+#   gcId = 4
+#   when = "Before GC"
+#   heapSpace = {
+#     start = 0xC0000000
+#     committedEnd = 0xC2200000
+#     committedSize = 34.0 MB
+#     reservedEnd = 0x100000000
+#     reservedSize = 1.0 GB
+#   }
+#   heapUsed = 20.5 MB
+# }
+

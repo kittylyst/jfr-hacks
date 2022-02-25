@@ -1,10 +1,7 @@
 package jfr;
 
 import jfr.cpu.OverallCPULoadHandler;
-import jfr.memory.G1HeapSummaryHandler;
-import jfr.memory.GCHeapSummaryHandler;
-import jfr.memory.ObjectAllocationInNewTLABHandler;
-import jfr.memory.ObjectAllocationOutsideTLABHandler;
+import jfr.memory.*;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -29,6 +26,7 @@ final class HandlerRegistry implements AutoCloseable {
 //            new NetworkWriteHandler(grouper),
             new G1HeapSummaryHandler(fileName),
             new GCHeapSummaryHandler(fileName),
+            new G1CombinedHandler(fileName),
 //            new ContextSwitchRateHandler(),
             new OverallCPULoadHandler(fileName)
 //            new ContainerConfigurationHandler(),
