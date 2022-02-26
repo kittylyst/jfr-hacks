@@ -34,12 +34,23 @@ public final class G1CombinedHandler extends AbstractFileWritingRecordedEventHan
   private static final String GC_EVENT_NAME = "jdk.GCHeapSummary";
   private static final String PARA_EVENT_NAME = "jdk.GCPhaseParallel";
 
+  private record CollectionData(long stwDuration, long totalUsed, long committed, Duration concurrentDuration) {
+    public static CollectionData of(Duration duration) {
+      return new CollectionData(0L, 0L, 0L, duration);
+    }
+
+    public CollectionData plusConcurrent(Duration duration) {
+      return new CollectionData(stwDuration, totalUsed, committed, concurrentDuration.plus(duration));
+    }
+
+    public CollectionData withSTW(long stwDuration, long totalUsed, long committed) {
+      return new CollectionData(stwDuration, totalUsed, committed, concurrentDuration);
+    }
+  }
+
   private final Map<Long, RecordedEvent> awaitingG1Pairs = new HashMap<>();
   private final Map<Long, RecordedEvent> awaitingGCPairs = new HashMap<>();
-  private long stwDuration = 0L;
-  private long totalUsed = 0L;
-  private long committed = 0L;
-  private Duration concurrentDuration = Duration.ZERO;
+  private final Map<Long, CollectionData> collections = new HashMap<>();
 
   public G1CombinedHandler(String fileName) throws IOException {
     super(fileName);
@@ -77,38 +88,52 @@ public final class G1CombinedHandler extends AbstractFileWritingRecordedEventHan
         accept(event, awaitingGCPairs, this::recordValuesGC);
         break;
       case PARA_EVENT_NAME:
-        concurrentDuration = concurrentDuration.plus(event.getDuration());
+        acceptConcurrent(event);
         break;
       default:
         logger.fine(String.format("G1 GC Event seen with odd name, this shouldn't happen: %s", name));
     }
-
   }
 
-  public void accept(RecordedEvent ev, Map<Long, RecordedEvent> beforeCache, BiConsumer<RecordedEvent, RecordedEvent> consumer) {
+  public void accept(RecordedEvent event, Map<Long, RecordedEvent> beforeCache, BiConsumer<RecordedEvent, RecordedEvent> consumer) {
     String when;
-    if (ev.hasField(WHEN)) {
-      when = ev.getString(WHEN);
+    if (event.hasField(WHEN)) {
+      when = event.getString(WHEN);
     } else {
-      logger.fine(String.format("G1 GC Event seen without when: %s", ev));
+      logger.fine(String.format("G1 GC Event seen without when: %s", event));
       return;
     }
     if (!(BEFORE.equals(when) || AFTER.equals(when))) {
-      logger.fine(String.format("G1 GC Event seen where when is neither before nor after: %s", ev));
+      logger.fine(String.format("G1 GC Event seen where when is neither before nor after: %s", event));
       return;
     }
 
-    if (!ev.hasField(GC_ID)) {
-      logger.fine(String.format("G1 GC Event seen without GC ID: %s", ev));
+    if (!event.hasField(GC_ID)) {
+      logger.fine(String.format("G1 GC Event seen without GC ID: %s", event));
       return;
     }
-    long gcId = ev.getLong(GC_ID);
+    long gcId = event.getLong(GC_ID);
 
     var pair = beforeCache.remove(gcId);
     if (pair == null) {
-      beforeCache.put(gcId, ev);
+      beforeCache.put(gcId, event);
     } else {
-      consumer.accept(pair, ev);
+      consumer.accept(pair, event);
+    }
+  }
+
+  private void acceptConcurrent(RecordedEvent event) {
+    if (!event.hasField(GC_ID)) {
+      logger.fine(String.format("G1 GC Event seen without GC ID: %s", event));
+      return;
+    }
+    long gcId = event.getLong(GC_ID);
+
+    var current = collections.get(gcId);
+    if (current == null) {
+      collections.put(gcId, CollectionData.of(event.getDuration()));
+    } else {
+      collections.put(gcId, current.plusConcurrent(event.getDuration()));
     }
   }
 
@@ -126,9 +151,10 @@ public final class G1CombinedHandler extends AbstractFileWritingRecordedEventHan
               try {
                 // This is where the write-out happens
                 var gcId = after.getLong("gcId");
+                var data = collections.remove(gcId);
                 var timestamp = after.getStartTime().toEpochMilli();
                 // Add STW duration, totalHeapUsed, heapCommitted
-                writer.write(String.format("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d%n", timestamp, gcId, stwDuration, concurrentDuration.toMillis(), totalUsed, committed, edenUsed, edenDelta, edenTotal, survivorUsed, regions));
+                writer.write(String.format("%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d%n", timestamp, gcId, data.stwDuration, data.concurrentDuration.toMillis(), data.totalUsed, data.committed, edenUsed, edenDelta, edenTotal, survivorUsed, regions));
               } catch (IOException e) {
                 System.err.println("Couldn't write to GC output file");
               }
@@ -140,13 +166,22 @@ public final class G1CombinedHandler extends AbstractFileWritingRecordedEventHan
   }
 
   private void recordValuesGC(RecordedEvent before, RecordedEvent after) {
-    stwDuration = after.getStartTime().toEpochMilli() - before.getStartTime().toEpochMilli();
+    var stwDuration = after.getStartTime().toEpochMilli() - before.getStartTime().toEpochMilli();
     if (after.hasField(HEAP_USED)) {
-      totalUsed = after.getLong(HEAP_USED);
+      var totalUsed = after.getLong(HEAP_USED);
       if (after.hasField(HEAP_SPACE)) {
         if (after.getValue(HEAP_SPACE) instanceof RecordedObject ro) {
-          committed = ro.getLong(COMMITTED_SIZE);
-       }
+          var committed = ro.getLong(COMMITTED_SIZE);
+          var gcId = after.getLong("gcId");
+          var current = collections.get(gcId);
+          if (current == null) {
+            // (long stwDuration, long totalUsed, long committed, Duration concurrentDuration)
+            collections.put(gcId, new CollectionData(stwDuration, totalUsed, committed, Duration.ZERO));
+          } else {
+            collections.put(gcId, current.withSTW(stwDuration, totalUsed, committed));
+          }
+
+        }
       }
     }
   }

@@ -42,5 +42,9 @@ target/
 # Clojure
 .cpcache/
 
+# Python
+__pycache__
+
 # tmp
 tmp/
+.DS_Store
