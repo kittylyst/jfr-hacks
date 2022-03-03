@@ -14,8 +14,8 @@ import static jfr.Constants.BEFORE;
 
 public class Analysis {
     private Connection conn = null;
-    private Map<String, STWEventDetails> stwEvents = new HashMap<>();
-    private Map<Long, STWGCSummary> stwCollectionsById = new HashMap<>();
+    private Map<Long, STWEventDetails> stwEventsById = new HashMap<>();
+    private Map<Long, GCSummary> stwCollectionsById = new HashMap<>();
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -35,33 +35,48 @@ public class Analysis {
         try (var connection = DriverManager.getConnection("jdbc:calcite:", properties)) {
             conn = connection;
             getSTWTimes();
-//            getConcurrentTimes();
+            getConcurrentTimes();
         } catch (SQLException sqlx) {
             sqlx.printStackTrace();
         }
         outputReport();
     }
 
+    private record STWEventDetails(Instant startTime, long gcId, String when, long heapUsed) {}
+
+    private record GCSummary(Instant startTime, long gcId, long stwDurationMs, long concurrentNs, long heapUsedAfter) {
+        public GCSummary(Long gcId, long duration) {
+            this(Instant.EPOCH, gcId, 0L, duration, 0L);
+        }
+
+        public GCSummary plus(long durationNs) {
+            return new GCSummary(startTime, gcId, stwDurationMs, concurrentNs + durationNs, heapUsedAfter);
+        }
+    }
+
+//    private record ConcurrentEventDetails(Instant startTime, String gcId, String when, long heapUsed) {}
+
     void getConcurrentTimes() throws SQLException {
         var statement = conn.prepareStatement("""
-            SELECT TRUNCATE_STACKTRACE("stackTrace", 40), SUM("weight")
-            FROM "JFR"."jdk.ObjectAllocationSample"
-            GROUP BY TRUNCATE_STACKTRACE("stackTrace", 40)
-            ORDER BY SUM("weight") DESC
-            LIMIT 10
+            SELECT "gcId", "duration"
+            FROM "JFR"."jdk.GCPhaseParallel"
+            ORDER BY "gcId"
             """);
 
         try (var rs = statement.executeQuery()) {
             while (rs.next()) {
-                System.out.println("Trace : " + rs.getString(1));
-                System.out.println("Weight: " + rs.getLong(2));
+                var gcId = Long.valueOf(rs.getString(1));
+                var durationNs = rs.getLong(2);
+
+                var collection = stwCollectionsById.get(gcId);
+                if (collection == null) {
+                    stwCollectionsById.put(gcId, new GCSummary(gcId, durationNs));
+                } else {
+                    stwCollectionsById.put(gcId, collection.plus(durationNs));
+                }
             }
         }
     }
-
-    private record STWEventDetails(Instant startTime, String gcId, String when, long heapUsed) {}
-
-    private record STWGCSummary(Instant startTime, String gcId, long durationMs, long heapUsedAfter) {}
 
     // FIXME What about heapSpace?
     void getSTWTimes() throws SQLException {
@@ -73,7 +88,7 @@ public class Analysis {
 
         try (var rs = statement.executeQuery()) {
             while (rs.next()) {
-                var gcId = rs.getString(2);
+                var gcId = Long.valueOf(rs.getString(2));
                 var when = rs.getString(3);
                 var current = new STWEventDetails(
                         rs.getTimestamp(1).toInstant(),
@@ -82,9 +97,9 @@ public class Analysis {
                         rs.getLong(4));
                 //                System.out.println("Space : " + rs.getLong(4));
 
-                var pair = stwEvents.remove(gcId);
+                var pair = stwEventsById.remove(gcId);
                 if (pair == null) {
-                    stwEvents.put(gcId, current);
+                    stwEventsById.put(gcId, current);
                 } else {
                     var gcSummary = switch (current.when) {
                         case BEFORE -> recordValuesGC(current, pair);
@@ -97,16 +112,16 @@ public class Analysis {
                     if (gcSummary == null) {
                         continue;
                     }
-                    stwCollectionsById.put(Long.parseLong(gcId), gcSummary);
+                    stwCollectionsById.put(gcId, gcSummary);
                 }
             }
         }
 
     }
 
-    STWGCSummary recordValuesGC(STWEventDetails before, STWEventDetails after) {
+    GCSummary recordValuesGC(STWEventDetails before, STWEventDetails after) {
         var stwDuration = after.startTime.toEpochMilli() - before.startTime.toEpochMilli();
-        return new STWGCSummary(before.startTime, before.gcId, stwDuration, after.heapUsed);
+        return new GCSummary(before.startTime, before.gcId, stwDuration, 0L, after.heapUsed);
     }
 
     void outputReport() {
