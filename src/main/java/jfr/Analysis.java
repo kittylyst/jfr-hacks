@@ -137,7 +137,7 @@ public class Analysis {
 
     void outputReport() {
         System.out.println("Config: "+ gcConfig);
-        System.out.println("timestamp,gcId,elapsedNs,cpuUsedNs,totalPause,longestPause,heapUsedAfter");
+        System.out.println("timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter");
         for (var id : stwCollectionsById.keySet().stream().sorted().toList()) {
             var collection = stwCollectionsById.get(id);
             var cpuTimeUsed = calculateCPUTimeNs(collection);
@@ -163,8 +163,12 @@ public class Analysis {
 //              long totalPause, long longestPause)
     private String outputCSV(GCSummary c, long cpuTimeUsedNs) {
         var timestamp = c.startTime.toEpochMilli();
+        var cpuTimeUsedMs = ((double)cpuTimeUsedNs / 1_000_000);
+        var elapsedMs = ((double)c.elapsedDurationNs / 1_000_000);
+        var totalPauseMs = ((double)c.totalPause / 1_000_000);
+        var longestPauseMs = ((double)c.longestPause / 1_000_000);
 
-        return String.format("%d,%d,%d,%d,%d,%d,%d", timestamp, c.gcId, c.elapsedDurationNs, cpuTimeUsedNs, c.totalPause, c.longestPause, c.heapUsedAfter);
+        return String.format("%d,%d,%f,%f,%f,%f,%d", timestamp, c.gcId, elapsedMs, cpuTimeUsedMs, totalPauseMs, longestPauseMs, c.heapUsedAfter);
     }
 
 
