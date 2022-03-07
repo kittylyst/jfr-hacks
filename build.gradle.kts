@@ -1,6 +1,7 @@
 plugins {
   application
   java
+  id("com.github.johnrengelman.shadow") version "7.1.2"
 }
 
 application {
@@ -18,7 +19,8 @@ repositories {
 }
 
 dependencies {
-  implementation("org.ow2.asm:asm:9.2")
+  implementation(files("lib/jfr-analytics.jar"))
+  implementation("org.apache.calcite:calcite-core:1.29.0")
 
   testImplementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
   testImplementation("org.mockito:mockito-core:4.1.0")
