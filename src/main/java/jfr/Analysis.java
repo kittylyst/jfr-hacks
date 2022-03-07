@@ -111,10 +111,10 @@ public class Analysis {
     // FIXME What about heapSpace?
     void getSTWTimes() throws SQLException {
         var statement = conn.prepareStatement("""
-            SELECT "s.startTime", "s.gcId", "s.when", "s.heapUsed", "c.name", "c.duration"
+            SELECT s."startTime", s."gcId", s."when", s."heapUsed", c."name", c."duration"
             FROM "JFR"."jdk.GCHeapSummary" s, "JFR"."jdk.GarbageCollection" c
-            WHERE "s.gcId" = "c.gcId"
-            ORDER BY "s.gcId"
+            WHERE s."gcId" = c."gcId"
+            ORDER BY s."gcId"
             """);
 
         try (var rs = statement.executeQuery()) {
