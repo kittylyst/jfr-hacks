@@ -14,6 +14,7 @@ import static jfr.Constants.BEFORE;
 
 public class Analysis {
     private Connection conn = null;
+    private GCConfig gcConfig = null;
     private Map<Long, STWEventDetails> stwEventsById = new HashMap<>();
     private Map<Long, GCSummary> stwCollectionsById = new HashMap<>();
 
@@ -29,34 +30,63 @@ public class Analysis {
 
     public void run(String fName) {
         var jfrFile = Path.of(fName);
-        Properties properties = new Properties();
+        var properties = new Properties();
         properties.put("model", JfrSchemaFactory.INLINE_MODEL.formatted(jfrFile));
 
         try (var connection = DriverManager.getConnection("jdbc:calcite:", properties)) {
             conn = connection;
+            getGCConfig();
             getSTWTimes();
-            getConcurrentTimes();
+            getG1NewParallelTimes();
         } catch (SQLException sqlx) {
             sqlx.printStackTrace();
         }
         outputReport();
     }
 
+    // FIXME Strings could be enums
+    private record GCConfig(String youngCollector, String oldCollector, int parallelGCThreads, int concurrentGCThreads) {}
+
+//    jdk.GCConfiguration {
+//        startTime = 14:43:44.799
+//        youngCollector = "G1New"
+//        oldCollector = "G1Old"
+//        parallelGCThreads = 2
+//        concurrentGCThreads = 1
+//        usesDynamicGCThreads = true
+//        isExplicitGCConcurrent = false
+//        isExplicitGCDisabled = false
+//        pauseTarget = N/A
+//        gcTimeRatio = 12
+//    }
+    void getGCConfig() throws SQLException {
+        var statement = conn.prepareStatement("""
+            SELECT "youngCollector", "oldCollector", "parallelGCThreads", "concurrentGCThreads"
+            FROM "JFR"."jdk.GCConfiguration"
+            LIMIT 1
+            """);
+
+        try (var rs = statement.executeQuery()) {
+            while (rs.next()) {
+                gcConfig = new GCConfig(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4));
+                break;
+            }
+        }
+    }
+
     private record STWEventDetails(Instant startTime, long gcId, String when, long heapUsed) {}
 
-    private record GCSummary(Instant startTime, long gcId, long stwDurationMs, long concurrentNs, long heapUsedAfter) {
+    private record GCSummary(Instant startTime, long gcId, long elapsedDurationMs, long parallelNs, long heapUsedAfter) {
         public GCSummary(Long gcId, long duration) {
             this(Instant.EPOCH, gcId, 0L, duration, 0L);
         }
 
         public GCSummary plus(long durationNs) {
-            return new GCSummary(startTime, gcId, stwDurationMs, concurrentNs + durationNs, heapUsedAfter);
+            return new GCSummary(startTime, gcId, elapsedDurationMs, parallelNs + durationNs, heapUsedAfter);
         }
     }
 
-//    private record ConcurrentEventDetails(Instant startTime, String gcId, String when, long heapUsed) {}
-
-    void getConcurrentTimes() throws SQLException {
+    void getG1NewParallelTimes() throws SQLException {
         var statement = conn.prepareStatement("""
             SELECT "gcId", "duration"
             FROM "JFR"."jdk.GCPhaseParallel"
@@ -81,9 +111,10 @@ public class Analysis {
     // FIXME What about heapSpace?
     void getSTWTimes() throws SQLException {
         var statement = conn.prepareStatement("""
-            SELECT "startTime", "gcId", "when", "heapUsed"
-            FROM "JFR"."jdk.GCHeapSummary"
-            ORDER BY "gcId"
+            SELECT "s.startTime", "s.gcId", "s.when", "s.heapUsed", "c.name", "c.duration"
+            FROM "JFR"."jdk.GCHeapSummary" s, "JFR"."jdk.GarbageCollection" c
+            WHERE "s.gcId" = "c.gcId"
+            ORDER BY "s.gcId"
             """);
 
         try (var rs = statement.executeQuery()) {
@@ -120,12 +151,14 @@ public class Analysis {
     }
 
     GCSummary recordValuesGC(STWEventDetails before, STWEventDetails after) {
-        var stwDuration = after.startTime.toEpochMilli() - before.startTime.toEpochMilli();
-        return new GCSummary(before.startTime, before.gcId, stwDuration, 0L, after.heapUsed);
+        // FIXME This is not the stwDuration, it is the elapsed wall clock time between the first and last event for the GC
+        var elapsedDuration = after.startTime.toEpochMilli() - before.startTime.toEpochMilli();
+//        System.out.println(String.format("%d %tQ %tQ", stwDuration, before.startTime.toEpochMilli(), after.startTime.toEpochMilli()));
+        return new GCSummary(before.startTime, before.gcId, elapsedDuration, 0L, after.heapUsed);
     }
 
     void outputReport() {
-        System.out.println("In outputReport");
+        System.out.println("Config: "+ gcConfig);
         for (var id : stwCollectionsById.keySet().stream().sorted().toList()) {
             System.out.println(stwCollectionsById.get(id));
         }
