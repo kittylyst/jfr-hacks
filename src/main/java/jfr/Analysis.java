@@ -9,14 +9,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
-import static jfr.Constants.AFTER;
-import static jfr.Constants.BEFORE;
-
 public class Analysis {
     private Connection conn = null;
     private GCConfig gcConfig = null;
     private Map<Long, STWEventDetails> stwEventsById = new HashMap<>();
     private Map<Long, GCSummary> stwCollectionsById = new HashMap<>();
+
+    private static final String SERIAL_YOUNG = "DefNew";
+    private static final String SERIAL_OLD = "SerialOld";
+    private static final String G1_YOUNG = "G1New";
+    private static final String G1_OLD = "G1Old";
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -36,8 +38,10 @@ public class Analysis {
         try (var connection = DriverManager.getConnection("jdbc:calcite:", properties)) {
             conn = connection;
             getGCConfig();
-            getSTWTimes();
-            getG1NewParallelTimes();
+            getGCTimings();
+            if (G1_YOUNG.equals(gcConfig.youngCollector)) {
+                getG1NewParallelTimes();
+            }
         } catch (SQLException sqlx) {
             sqlx.printStackTrace();
         }
@@ -74,15 +78,12 @@ public class Analysis {
         }
     }
 
-    private record STWEventDetails(Instant startTime, long gcId, String when, long heapUsed) {}
+    private record STWEventDetails(Instant startTime, long gcId, long heapUsed) {}
 
-    private record GCSummary(Instant startTime, long gcId, long elapsedDurationMs, long parallelNs, long heapUsedAfter) {
-        public GCSummary(Long gcId, long duration) {
-            this(Instant.EPOCH, gcId, 0L, duration, 0L);
-        }
-
+    private record GCSummary(Instant startTime, long gcId, String name, long elapsedDurationNs, long parallelNs, long heapUsedAfter,
+                             long totalPause, long longestPause) {
         public GCSummary plus(long durationNs) {
-            return new GCSummary(startTime, gcId, elapsedDurationMs, parallelNs + durationNs, heapUsedAfter);
+            return new GCSummary(startTime, gcId, name, elapsedDurationNs, parallelNs + durationNs, heapUsedAfter, totalPause, longestPause);
         }
     }
 
@@ -100,7 +101,7 @@ public class Analysis {
 
                 var collection = stwCollectionsById.get(gcId);
                 if (collection == null) {
-                    stwCollectionsById.put(gcId, new GCSummary(gcId, durationNs));
+                    System.err.println("GCPhaseParallel seen before start event for gcId: "+ gcId);
                 } else {
                     stwCollectionsById.put(gcId, collection.plus(durationNs));
                 }
@@ -109,59 +110,61 @@ public class Analysis {
     }
 
     // FIXME What about heapSpace?
-    void getSTWTimes() throws SQLException {
+    void getGCTimings() throws SQLException {
         var statement = conn.prepareStatement("""
-            SELECT s."startTime", s."gcId", s."when", s."heapUsed", c."name", c."duration"
+            SELECT s."startTime", s."gcId", s."heapUsed", c."name", c."duration", c."sumOfPauses", c."longestPause"
             FROM "JFR"."jdk.GCHeapSummary" s, "JFR"."jdk.GarbageCollection" c
-            WHERE s."gcId" = c."gcId"
+            WHERE s."gcId" = c."gcId" AND s."when" = 'After GC'
             ORDER BY s."gcId"
             """);
 
         try (var rs = statement.executeQuery()) {
             while (rs.next()) {
+                var start = rs.getTimestamp(1).toInstant();
                 var gcId = Long.valueOf(rs.getString(2));
-                var when = rs.getString(3);
-                var current = new STWEventDetails(
-                        rs.getTimestamp(1).toInstant(),
-                        gcId,
-                        when,
-                        rs.getLong(4));
-                //                System.out.println("Space : " + rs.getLong(4));
+                var used = rs.getLong(3);
+                var name = rs.getString(4);
+                var elapsedDurationNs = rs.getLong(5);
+                var totalPause = rs.getLong(6);
+                var longestPause = rs.getLong(7);
 
-                var pair = stwEventsById.remove(gcId);
-                if (pair == null) {
-                    stwEventsById.put(gcId, current);
-                } else {
-                    var gcSummary = switch (current.when) {
-                        case BEFORE -> recordValuesGC(current, pair);
-                        case AFTER -> recordValuesGC(pair, current);
-                        default -> {
-                            System.err.println("Weird event seen: "+ current);
-                            yield null;
-                        }
-                    };
-                    if (gcSummary == null) {
-                        continue;
-                    }
-                    stwCollectionsById.put(gcId, gcSummary);
-                }
+                var summary = new GCSummary(start, gcId, name, elapsedDurationNs, 0L, used, totalPause, longestPause);
+                stwCollectionsById.put(gcId, summary);
             }
         }
 
     }
 
-    GCSummary recordValuesGC(STWEventDetails before, STWEventDetails after) {
-        // FIXME This is not the stwDuration, it is the elapsed wall clock time between the first and last event for the GC
-        var elapsedDuration = after.startTime.toEpochMilli() - before.startTime.toEpochMilli();
-//        System.out.println(String.format("%d %tQ %tQ", stwDuration, before.startTime.toEpochMilli(), after.startTime.toEpochMilli()));
-        return new GCSummary(before.startTime, before.gcId, elapsedDuration, 0L, after.heapUsed);
-    }
-
     void outputReport() {
         System.out.println("Config: "+ gcConfig);
+        System.out.println("timestamp,gcId,elapsedNs,cpuUsedNs,totalPause,longestPause,heapUsedAfter");
         for (var id : stwCollectionsById.keySet().stream().sorted().toList()) {
-            System.out.println(stwCollectionsById.get(id));
+            var collection = stwCollectionsById.get(id);
+            var cpuTimeUsed = calculateCPUTimeNs(collection);
+
+            System.out.println(outputCSV(collection, cpuTimeUsed));
         }
+    }
+
+    long calculateCPUTimeNs(GCSummary collection) {
+        var isConcurrent = switch (collection.name) {
+            case G1_OLD -> true;
+            case G1_YOUNG, SERIAL_YOUNG, SERIAL_OLD  -> false;
+            default -> false;
+        };
+        if (isConcurrent) {
+            return collection.elapsedDurationNs * gcConfig.concurrentGCThreads + collection.totalPause * gcConfig.parallelGCThreads;
+        } else {
+            return collection.elapsedDurationNs * gcConfig.parallelGCThreads;
+        }
+    }
+
+//    GCSummary(Instant startTime, long gcId, String name, long elapsedDurationNs, long parallelNs, long heapUsedAfter,
+//              long totalPause, long longestPause)
+    private String outputCSV(GCSummary c, long cpuTimeUsedNs) {
+        var timestamp = c.startTime.toEpochMilli();
+
+        return String.format("%d,%d,%d,%d,%d,%d,%d", timestamp, c.gcId, c.elapsedDurationNs, cpuTimeUsedNs, c.totalPause, c.longestPause, c.heapUsedAfter);
     }
 
 
