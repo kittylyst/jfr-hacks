@@ -12,8 +12,8 @@ import java.util.Properties;
 public class Analysis {
     private Connection conn = null;
     private GCConfig gcConfig = null;
-    private Map<Long, STWEventDetails> stwEventsById = new HashMap<>();
     private Map<Long, GCSummary> stwCollectionsById = new HashMap<>();
+    private long fileStartTime = 0L;
 
     private static final String SERIAL_YOUNG = "DefNew";
     private static final String SERIAL_OLD = "SerialOld";
@@ -78,8 +78,6 @@ public class Analysis {
         }
     }
 
-    private record STWEventDetails(Instant startTime, long gcId, long heapUsed) {}
-
     private record GCSummary(Instant startTime, long gcId, String name, long elapsedDurationNs, long parallelNs, long heapUsedAfter,
                              long totalPause, long longestPause) {
         public GCSummary plus(long durationNs) {
@@ -127,6 +125,9 @@ public class Analysis {
                 var elapsedDurationNs = rs.getLong(5);
                 var totalPause = rs.getLong(6);
                 var longestPause = rs.getLong(7);
+                if (fileStartTime == 0L) {
+                    fileStartTime = start.toEpochMilli();
+                }
 
                 var summary = new GCSummary(start, gcId, name, elapsedDurationNs, 0L, used, totalPause, longestPause);
                 stwCollectionsById.put(gcId, summary);
@@ -136,7 +137,7 @@ public class Analysis {
     }
 
     void outputReport() {
-        System.out.println("Config: "+ gcConfig);
+//        System.out.println("Config: "+ gcConfig);
         System.out.println("timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter");
         for (var id : stwCollectionsById.keySet().stream().sorted().toList()) {
             var collection = stwCollectionsById.get(id);
@@ -153,16 +154,14 @@ public class Analysis {
             default -> false;
         };
         if (isConcurrent) {
-            return collection.elapsedDurationNs * gcConfig.concurrentGCThreads + collection.totalPause * gcConfig.parallelGCThreads;
+            return collection.elapsedDurationNs * gcConfig.concurrentGCThreads + (collection.totalPause * gcConfig.parallelGCThreads - gcConfig.concurrentGCThreads);
         } else {
             return collection.elapsedDurationNs * gcConfig.parallelGCThreads;
         }
     }
 
-//    GCSummary(Instant startTime, long gcId, String name, long elapsedDurationNs, long parallelNs, long heapUsedAfter,
-//              long totalPause, long longestPause)
-    private String outputCSV(GCSummary c, long cpuTimeUsedNs) {
-        var timestamp = c.startTime.toEpochMilli();
+    String outputCSV(GCSummary c, long cpuTimeUsedNs) {
+        var timestamp = c.startTime.toEpochMilli() - fileStartTime;
         var cpuTimeUsedMs = ((double)cpuTimeUsedNs / 1_000_000);
         var elapsedMs = ((double)c.elapsedDurationNs / 1_000_000);
         var totalPauseMs = ((double)c.totalPause / 1_000_000);

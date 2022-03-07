@@ -11,6 +11,10 @@ class JfrDataPlot:
     def __init__(self, data) -> None:
         self.data = data
 
+    def __init__(self, data, data2) -> None:
+        self.data = data
+        self.data2 = data2
+
     @staticmethod
     def stem_filename(fname):
         return re.sub(r"\.csv$", "", fname)
@@ -29,32 +33,60 @@ class JfrDataPlot:
     # Stupid grep trick to work around cat apparently not having the ability to print the name of the
     # file before the line
     # grep -H -E -e '' *_data/gc*.csv | sort -n --field-separator=',' --key=2
+
+    # New CSV format for GC from Analysis class
+    # timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter
     def plot_gc(self, stem):
-        self.data.hist(bins=50, figsize=(15,15))
-        plt.show()
+        self.data.plot(x="timestamp", y=["elapsedMs"])
+        image_name = stem + '_elapsed.png'
+        plt.savefig(image_name)
+        self.data.plot(x="timestamp", y=["longestPause"])
+        image_name = stem + '_longest.png'
+        plt.savefig(image_name)
+        self.data.plot(x="timestamp", y=["heapUsedAfter"])
+        image_name = stem + '_heap_after.png'
+        plt.savefig(image_name)
+
+        # timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter
+    def biplot_gc(self, stem, stem2):
+        ax = self.data.plot(x="timestamp", y=["elapsedMs"])
+        self.data2.plot(ax=ax, x="timestamp", y=["elapsedMs"])
+        ax.legend([stem, stem2])
+        # plt.show()
+        image_name = stem + '_'+ stem2 +'_elapsed.png'
+        plt.savefig(image_name)
 
 def usage():
     print("""
 python plot-jfr-data.py cpu <file>
 python plot-jfr-data.py cpu_show <file>
 python plot-jfr-data.py gcTime <file>
+python plot-jfr-data.py gcBiPlot <file1> <file2>
 """)
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
-        # File handling, and parse the CSV to a frame
+        mode = sys.argv[1]
         fname = sys.argv[2]
         stem = JfrDataPlot.stem_filename(fname)
         data = pd.read_csv(fname)
         data.head()
-        plotter = JfrDataPlot(data)
-        modes = {'cpu': plotter.plot_cpu, 'cpu_show': plotter.show_cpu, 'gcTime': plotter.plot_gc }
 
-        mode = sys.argv[1]
-        if mode in modes:
-            modes[mode](stem, *sys.argv[3:])
+        if mode == 'gcBiPlot':
+            fname2 = sys.argv[3]
+            stem2 = JfrDataPlot.stem_filename(fname2)
+            data2 = pd.read_csv(fname2)
+            data2.head()
+            plotter = JfrDataPlot(data, data2)
+            plotter.biplot_gc(stem, stem2)
         else:
-            usage()
+            # File handling, and parse the CSV to a frame
+            plotter = JfrDataPlot(data)
+            modes = {'cpu': plotter.plot_cpu, 'cpu_show': plotter.show_cpu, 'gcTime': plotter.plot_gc }
+            if mode in modes:
+                modes[mode](stem, *sys.argv[3:])
+            else:
+                usage()
     else:
         usage()
 
