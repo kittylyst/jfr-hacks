@@ -56,12 +56,24 @@ class JfrDataPlot:
         image_name = stem + '_'+ stem2 +'_elapsed.png'
         plt.savefig(image_name)
 
+    def biplot_gc_cum(self, stem, stem2):
+        self.data["cpu_cum_sum"] = self.data["cpuUsedMs"].cumsum()
+        self.data2["cpu_cum_sum"] = self.data2["cpuUsedMs"].cumsum()
+        ax = self.data.plot(x="timestamp", y=["cpu_cum_sum"])
+        self.data2.plot(ax=ax, x="timestamp", y=["cpu_cum_sum"])
+        ax.legend([stem, stem2])
+        # plt.show()
+        image_name = stem + '_'+ stem2 +'_cpu_cumulative.png'
+        plt.savefig(image_name)
+
+
 def usage():
     print("""
 python plot-jfr-data.py cpu <file>
 python plot-jfr-data.py cpu_show <file>
-python plot-jfr-data.py gcTime <file>
-python plot-jfr-data.py gcBiPlot <file1> <file2>
+python plot-jfr-data.py gc_time <file>
+python plot-jfr-data.py gc_bi_plot <file1> <file2>
+python plot-jfr-data.py gc_cumulative <file1> <file2>
 """)
 
 if __name__ == "__main__":
@@ -72,17 +84,25 @@ if __name__ == "__main__":
         data = pd.read_csv(fname)
         data.head()
 
-        if mode == 'gcBiPlot':
+        # FIXME Handle the multiple plots in a better way
+        if mode == 'gc_bi_plot':
             fname2 = sys.argv[3]
             stem2 = JfrDataPlot.stem_filename(fname2)
             data2 = pd.read_csv(fname2)
             data2.head()
             plotter = JfrDataPlot(data, data2)
             plotter.biplot_gc(stem, stem2)
+        elif mode == 'gc_cumulative':
+            fname2 = sys.argv[3]
+            stem2 = JfrDataPlot.stem_filename(fname2)
+            data2 = pd.read_csv(fname2)
+            data2.head()
+            plotter = JfrDataPlot(data, data2)
+            plotter.biplot_gc_cum(stem, stem2)
         else:
             # File handling, and parse the CSV to a frame
             plotter = JfrDataPlot(data)
-            modes = {'cpu': plotter.plot_cpu, 'cpu_show': plotter.show_cpu, 'gcTime': plotter.plot_gc }
+            modes = {'cpu': plotter.plot_cpu, 'cpu_show': plotter.show_cpu, 'gc_time': plotter.plot_gc }
             if mode in modes:
                 modes[mode](stem, *sys.argv[3:])
             else:

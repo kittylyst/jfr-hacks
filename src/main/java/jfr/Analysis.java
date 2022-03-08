@@ -72,7 +72,15 @@ public class Analysis {
 
         try (var rs = statement.executeQuery()) {
             while (rs.next()) {
-                gcConfig = new GCConfig(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getInt(4));
+                final var youngGC = rs.getString(1);
+                final var oldGC = rs.getString(2);
+                var parallelThreads = rs.getInt(3);
+                var concThreads = rs.getInt(4);
+                if (SERIAL_OLD.equals(oldGC)) {
+                    parallelThreads = 1;
+                    concThreads = 1;
+                }
+                gcConfig = new GCConfig(youngGC, oldGC, parallelThreads, concThreads);
                 break;
             }
         }
@@ -137,7 +145,7 @@ public class Analysis {
     }
 
     void outputReport() {
-//        System.out.println("Config: "+ gcConfig);
+        System.err.println("Config: "+ gcConfig);
         System.out.println("timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter");
         for (var id : stwCollectionsById.keySet().stream().sorted().toList()) {
             var collection = stwCollectionsById.get(id);
@@ -148,16 +156,19 @@ public class Analysis {
     }
 
     long calculateCPUTimeNs(GCSummary collection) {
-        var isConcurrent = switch (collection.name) {
-            case G1_OLD -> true;
-            case G1_YOUNG, SERIAL_YOUNG, SERIAL_OLD  -> false;
-            default -> false;
-        };
-        if (isConcurrent) {
+        if (isConcurrent(collection)) {
             return collection.elapsedDurationNs * gcConfig.concurrentGCThreads + (collection.totalPause * gcConfig.parallelGCThreads - gcConfig.concurrentGCThreads);
         } else {
             return collection.elapsedDurationNs * gcConfig.parallelGCThreads;
         }
+    }
+
+    static boolean isConcurrent(GCSummary collection) {
+        return switch (collection.name) {
+            case G1_OLD -> true;
+            case G1_YOUNG, SERIAL_YOUNG, SERIAL_OLD  -> false;
+            default -> false;
+        };
     }
 
     String outputCSV(GCSummary c, long cpuTimeUsedNs) {
