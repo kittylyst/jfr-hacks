@@ -43,17 +43,28 @@ class JfrDataPlot:
         self.data.plot(x="timestamp", y=["longestPause"])
         image_name = stem + '_longest.png'
         plt.savefig(image_name)
+        self.data.plot(x="timestamp", y=["totalPause"])
+        image_name = stem + '_total_pause.png'
+        plt.savefig(image_name)
         self.data.plot(x="timestamp", y=["heapUsedAfter"])
         image_name = stem + '_heap_after.png'
         plt.savefig(image_name)
 
-        # timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter
-    def biplot_gc(self, stem, stem2):
+    # timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter
+    def biplot_gc_elapsed(self, stem, stem2):
         ax = self.data.plot(x="timestamp", y=["elapsedMs"])
         self.data2.plot(ax=ax, x="timestamp", y=["elapsedMs"])
         ax.legend([stem, stem2])
         # plt.show()
         image_name = stem + '_'+ stem2 +'_elapsed.png'
+        plt.savefig(image_name)
+
+    def biplot_gc_total(self, stem, stem2):
+        ax = self.data.plot(x="timestamp", y=["totalPause"])
+        self.data2.plot(ax=ax, x="timestamp", y=["totalPause"])
+        ax.legend([stem, stem2])
+        # plt.show()
+        image_name = stem + '_'+ stem2 +'_total_pause.png'
         plt.savefig(image_name)
 
     def biplot_gc_cum(self, stem, stem2):
@@ -72,7 +83,8 @@ def usage():
 python plot-jfr-data.py cpu <file>
 python plot-jfr-data.py cpu_show <file>
 python plot-jfr-data.py gc_time <file>
-python plot-jfr-data.py gc_bi_plot <file1> <file2>
+python plot-jfr-data.py gc_bi_plot_elapsed <file1> <file2>
+python plot-jfr-data.py gc_bi_plot_total <file1> <file2>
 python plot-jfr-data.py gc_cumulative <file1> <file2>
 """)
 
@@ -85,13 +97,20 @@ if __name__ == "__main__":
         data.head()
 
         # FIXME Handle the multiple plots in a better way
-        if mode == 'gc_bi_plot':
+        if mode == 'gc_bi_plot_elapsed':
             fname2 = sys.argv[3]
             stem2 = JfrDataPlot.stem_filename(fname2)
             data2 = pd.read_csv(fname2)
             data2.head()
             plotter = JfrDataPlot(data, data2)
-            plotter.biplot_gc(stem, stem2)
+            plotter.biplot_gc_elapsed(stem, stem2)
+        elif mode == 'gc_bi_plot_total':
+            fname2 = sys.argv[3]
+            stem2 = JfrDataPlot.stem_filename(fname2)
+            data2 = pd.read_csv(fname2)
+            data2.head()
+            plotter = JfrDataPlot(data, data2)
+            plotter.biplot_gc_total(stem, stem2)
         elif mode == 'gc_cumulative':
             fname2 = sys.argv[3]
             stem2 = JfrDataPlot.stem_filename(fname2)
