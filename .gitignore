@@ -33,6 +33,9 @@ out/
 build/
 *.iml
 
+# VS Code
+.vscode/
+
 # Gradle local
 .gradle/
 
