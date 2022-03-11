@@ -37,31 +37,31 @@ class JfrDataPlot:
     # New CSV format for GC from Analysis class
     # timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter
     def plot_gc(self, stem):
-        self.data.plot(x="timestamp", y=["elapsedMs"])
+        self.data.plot(x="timestamp", y=["elapsedMs"], title='GC Elapsed Time', ylabel='millis')
         image_name = stem + '_elapsed.png'
         plt.savefig(image_name)
-        self.data.plot(x="timestamp", y=["longestPause"])
+        self.data.plot(x="timestamp", y=["longestPause"], title='GC Longest Pause per Collection', ylabel='millis')
         image_name = stem + '_longest.png'
         plt.savefig(image_name)
-        self.data.plot(x="timestamp", y=["totalPause"])
+        self.data.plot(x="timestamp", y=["totalPause"], title='GC Total Pause per Collection', ylabel='millis')
         image_name = stem + '_total_pause.png'
         plt.savefig(image_name)
-        self.data.plot(x="timestamp", y=["heapUsedAfter"])
+        self.data.plot(x="timestamp", y=["heapUsedAfter"], title='Heap Used After Collection', ylabel='bytes')
         image_name = stem + '_heap_after.png'
         plt.savefig(image_name)
 
     # timestamp,gcId,elapsedMs,cpuUsedMs,totalPause,longestPause,heapUsedAfter
     def biplot_gc_elapsed(self, stem, stem2):
-        ax = self.data.plot(x="timestamp", y=["elapsedMs"])
-        self.data2.plot(ax=ax, x="timestamp", y=["elapsedMs"])
+        ax = self.data.plot(x="timestamp", y=["elapsedMs"], title='GC Elapsed Time', ylabel='millis')
+        self.data2.plot(ax=ax, x="timestamp", y=["elapsedMs"], title='GC Elapsed Time', ylabel='millis')
         ax.legend([stem, stem2])
         # plt.show()
         image_name = stem + '_'+ stem2 +'_elapsed.png'
         plt.savefig(image_name)
 
     def biplot_gc_total(self, stem, stem2):
-        ax = self.data.plot(x="timestamp", y=["totalPause"])
-        self.data2.plot(ax=ax, x="timestamp", y=["totalPause"])
+        ax = self.data.plot(x="timestamp", y=["totalPause"], title='GC Total Pause per Collection', ylabel='millis')
+        self.data2.plot(ax=ax, x="timestamp", y=["totalPause"], title='GC Total Pause per Collection', ylabel='millis')
         ax.legend([stem, stem2])
         # plt.show()
         image_name = stem + '_'+ stem2 +'_total_pause.png'
@@ -70,8 +70,8 @@ class JfrDataPlot:
     def biplot_gc_cum(self, stem, stem2):
         self.data["cpu_cum_sum"] = self.data["cpuUsedMs"].cumsum()
         self.data2["cpu_cum_sum"] = self.data2["cpuUsedMs"].cumsum()
-        ax = self.data.plot(x="timestamp", y=["cpu_cum_sum"])
-        self.data2.plot(ax=ax, x="timestamp", y=["cpu_cum_sum"])
+        ax = self.data.plot(x="timestamp", y=["cpu_cum_sum"], title='GC Cumulative Time', ylabel='millis')
+        self.data2.plot(ax=ax, x="timestamp", y=["cpu_cum_sum"], title='GC Cumulative Time', ylabel='millis')
         ax.legend([stem, stem2])
         # plt.show()
         image_name = stem + '_'+ stem2 +'_cpu_cumulative.png'
@@ -85,11 +85,12 @@ python plot-jfr-data.py cpu_show <file>
 python plot-jfr-data.py gc_time <file>
 python plot-jfr-data.py gc_bi_plot_elapsed <file1> <file2>
 python plot-jfr-data.py gc_bi_plot_total <file1> <file2>
-python plot-jfr-data.py gc_cumulative <file1> <file2>
+python plot-jfr-data.py gc_bi_cumulative <file1> <file2>
 """)
 
 if __name__ == "__main__":
     if len(sys.argv) > 2:
+        # File handling, and parse the CSV to a frame
         mode = sys.argv[1]
         fname = sys.argv[2]
         stem = JfrDataPlot.stem_filename(fname)
@@ -111,7 +112,7 @@ if __name__ == "__main__":
             data2.head()
             plotter = JfrDataPlot(data, data2)
             plotter.biplot_gc_total(stem, stem2)
-        elif mode == 'gc_cumulative':
+        elif mode == 'gc_bi_cumulative':
             fname2 = sys.argv[3]
             stem2 = JfrDataPlot.stem_filename(fname2)
             data2 = pd.read_csv(fname2)
@@ -119,7 +120,6 @@ if __name__ == "__main__":
             plotter = JfrDataPlot(data, data2)
             plotter.biplot_gc_cum(stem, stem2)
         else:
-            # File handling, and parse the CSV to a frame
             plotter = JfrDataPlot(data)
             modes = {'cpu': plotter.plot_cpu, 'cpu_show': plotter.show_cpu, 'gc_time': plotter.plot_gc }
             if mode in modes:
