@@ -19,6 +19,9 @@ public class Analysis {
     private static final String SERIAL_OLD = "SerialOld";
     private static final String G1_YOUNG = "G1New";
     private static final String G1_OLD = "G1Old";
+    private static final String PARALLEL_YOUNG = "ParallelScavenge";
+    private static final String PARALLEL_OLD = "ParallelOld";
+
 
     public static void main(String[] args) {
         if (args.length < 1) {
@@ -39,7 +42,7 @@ public class Analysis {
             conn = connection;
             getGCConfig();
             getGCTimings();
-            if (G1_YOUNG.equals(gcConfig.youngCollector)) {
+            if (G1_OLD.equals(gcConfig.oldCollector)) {
                 getG1NewParallelTimes();
             }
         } catch (SQLException sqlx) {
@@ -49,20 +52,8 @@ public class Analysis {
     }
 
     // FIXME Strings could be enums
-    private record GCConfig(String youngCollector, String oldCollector, int parallelGCThreads, int concurrentGCThreads) {}
+    private record GCConfig(String youngCollector, String oldCollector, int stwGCThreads, int concurrentGCThreads) {}
 
-//    jdk.GCConfiguration {
-//        startTime = 14:43:44.799
-//        youngCollector = "G1New"
-//        oldCollector = "G1Old"
-//        parallelGCThreads = 2
-//        concurrentGCThreads = 1
-//        usesDynamicGCThreads = true
-//        isExplicitGCConcurrent = false
-//        isExplicitGCDisabled = false
-//        pauseTarget = N/A
-//        gcTimeRatio = 12
-//    }
     void getGCConfig() throws SQLException {
         var statement = conn.prepareStatement("""
             SELECT "youngCollector", "oldCollector", "parallelGCThreads", "concurrentGCThreads"
@@ -78,7 +69,7 @@ public class Analysis {
                 var concThreads = rs.getInt(4);
                 if (SERIAL_OLD.equals(oldGC)) {
                     parallelThreads = 1;
-                    concThreads = 1;
+//                    concThreads = 1;
                 }
                 gcConfig = new GCConfig(youngGC, oldGC, parallelThreads, concThreads);
                 break;
@@ -157,9 +148,9 @@ public class Analysis {
 
     long calculateCPUTimeNs(GCSummary collection) {
         if (isConcurrent(collection)) {
-            return collection.elapsedDurationNs * gcConfig.concurrentGCThreads + (collection.totalPause * gcConfig.parallelGCThreads - gcConfig.concurrentGCThreads);
+            return collection.elapsedDurationNs * gcConfig.concurrentGCThreads + (collection.totalPause * gcConfig.stwGCThreads - gcConfig.concurrentGCThreads);
         } else {
-            return collection.elapsedDurationNs * gcConfig.parallelGCThreads;
+            return collection.elapsedDurationNs * gcConfig.stwGCThreads;
         }
     }
 
