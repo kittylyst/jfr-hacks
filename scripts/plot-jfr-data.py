@@ -36,10 +36,11 @@ class JfrDataPlot:
 
     def biplot_gc_total(self, stem, stem2):
         ax = self.data.plot(x="timestamp", y=["totalPause"], title='GC Total Pause per Collection', ylabel='millis')
-        self.data2.plot(ax=ax, x="timestamp", y=["totalPause"], title='GC Total Pauseper Collection', ylabel='millis')
+        self.data2.plot(ax=ax, x="timestamp", y=["totalPause"], title='GC Total Pause per Collection', ylabel='millis')
         ax.legend([stem, stem2])
         # plt.show()
         image_name = stem + '_'+ stem2 +'_total_pause.png'
+        plt.savefig(image_name)
 
     def plot_gc(self, stems):
         stem_base = '_'.join(stems)
