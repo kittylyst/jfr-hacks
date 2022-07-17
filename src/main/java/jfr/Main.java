@@ -30,7 +30,7 @@ public class Main {
         }
     }
 
-    private static Object decodeEvent(RecordedEvent event) {
-        return null;
-    }
+//    private static Object decodeEvent(RecordedEvent event) {
+//        return null;
+//    }
 }

@@ -43,7 +43,7 @@ public class Analysis {
             getGCConfig();
             getGCTimings();
             if (G1_OLD.equals(gcConfig.oldCollector)) {
-                getG1NewParallelTimes();
+                getG1PhaseParallelTimes();
             }
         } catch (SQLException sqlx) {
             sqlx.printStackTrace();
@@ -84,7 +84,7 @@ public class Analysis {
         }
     }
 
-    void getG1NewParallelTimes() throws SQLException {
+    void getG1PhaseParallelTimes() throws SQLException {
         var statement = conn.prepareStatement("""
             SELECT "gcId", "duration"
             FROM "JFR"."jdk.GCPhaseParallel"
